@@ -2,35 +2,36 @@ package org.example;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 
 public class Main extends JFrame {
 
-    private ArrayList<Mahasiswa> list;
+    private ArrayList<Mahasiswa> list = new ArrayList<>();
     private DefaultTableModel model;
-
-    private JTextField txtNama, txtNIM, txtNilai;
+    private JTable table;
+    private JTextField txtNama, txtNIM, txtNilai, txtSearch;
     private JLabel lblLaporan;
-
     private int selectedIndex = -1;
 
     public Main() {
         setTitle("Aplikasi Kelulusan Mahasiswa");
-        setSize(750, 480);
+        setSize(800, 500);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-
-        list = FileManager.load();
 
         model = new DefaultTableModel(
                 new String[]{"Nama", "NIM", "Nilai", "Status"}, 0
         );
 
         JTabbedPane tab = new JTabbedPane();
-        tab.add("Dashboard", dashboard());
+        tab.add("Dashboard", dashboardPanel());
+        tab.add("List Data", listDataPanel());
         tab.add("Input Data", inputPanel());
         tab.add("Laporan", laporanPanel());
 
@@ -38,40 +39,84 @@ public class Main extends JFrame {
     }
 
     // ================= DASHBOARD =================
-    private JPanel dashboard() {
-        JPanel p = new JPanel();
-        JLabel lbl = new JLabel("SELAMAT DATANG DI APLIKASI KELULUSAN MAHASISWA");
-        lbl.setFont(new Font("Arial", Font.BOLD, 16));
-        p.add(lbl);
+    private JPanel dashboardPanel() {
+        JPanel p = new JPanel(new BorderLayout());
+        JLabel lbl = new JLabel("APLIKASI KELULUSAN MAHASISWA", JLabel.CENTER);
+        lbl.setFont(new Font("Arial", Font.BOLD, 20));
+        p.add(lbl, BorderLayout.CENTER);
+        return p;
+    }
+
+    // ================= LIST DATA =================
+    private JPanel listDataPanel() {
+        JPanel p = new JPanel(new BorderLayout(10, 10));
+        p.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+        table = new JTable(model);
+        table.setRowHeight(28);
+        setHeaderStyle(table);
+
+        TableRowSorter<DefaultTableModel> sorter =
+                new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+
+        txtSearch = new JTextField();
+        txtSearch.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { search(); }
+            public void removeUpdate(DocumentEvent e) { search(); }
+            public void changedUpdate(DocumentEvent e) { search(); }
+
+            private void search() {
+                sorter.setRowFilter(RowFilter.regexFilter(
+                        "(?i)" + txtSearch.getText()
+                ));
+            }
+        });
+
+        JButton btnEdit = new JButton("Edit");
+        JButton btnHapus = new JButton("Hapus");
+
+        btnEdit.addActionListener(e -> editData());
+        btnHapus.addActionListener(e -> hapusData());
+
+        JPanel top = new JPanel(new BorderLayout());
+        top.add(new JLabel("Cari: "), BorderLayout.WEST);
+        top.add(txtSearch, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel();
+        bottom.add(btnEdit);
+        bottom.add(btnHapus);
+
+        p.add(top, BorderLayout.NORTH);
+        p.add(new JScrollPane(table), BorderLayout.CENTER);
+        p.add(bottom, BorderLayout.SOUTH);
+
         return p;
     }
 
     // ================= INPUT DATA =================
     private JPanel inputPanel() {
         JPanel p = new JPanel(new GridLayout(8, 1, 10, 10));
-        p.setBorder(new EmptyBorder(30, 60, 30, 60));
+        p.setBorder(new EmptyBorder(20, 80, 20, 80));
 
         txtNama = new JTextField();
         txtNIM = new JTextField();
         txtNilai = new JTextField();
 
-        JButton btnTambah = createButton("Tambah Data", new Color(46, 204, 113));
-        JButton btnUpdate = createButton("Update Data", new Color(243, 156, 18));
-        JButton btnLihat = createButton("Lihat Data", new Color(52, 152, 219));
+        JButton btnTambah = new JButton("Simpan Data");
+        JButton btnUpdate = new JButton("Update Data");
 
         btnTambah.addActionListener(e -> tambahData());
         btnUpdate.addActionListener(e -> updateData());
-        btnLihat.addActionListener(e -> showTablePopup());
 
         p.add(new JLabel("Nama Mahasiswa"));
         p.add(txtNama);
         p.add(new JLabel("NIM"));
         p.add(txtNIM);
-        p.add(new JLabel("Nilai Akhir"));
+        p.add(new JLabel("Nilai"));
         p.add(txtNilai);
         p.add(btnTambah);
         p.add(btnUpdate);
-        p.add(btnLihat);
 
         return p;
     }
@@ -86,121 +131,80 @@ public class Main extends JFrame {
         return p;
     }
 
-    // ================= CREATE =================
+    // ================= CRUD =================
     private void tambahData() {
         try {
+            String nama = txtNama.getText();
+            String nim = txtNIM.getText();
+            int nilai = Integer.parseInt(txtNilai.getText());
+
+            if (!nama.matches("[a-zA-Z ]+") || !nim.matches("\\d+")) {
+                JOptionPane.showMessageDialog(this, "Input tidak valid!");
+                return;
+            }
+
+            Mahasiswa m = new Mahasiswa(nama, nim, nilai);
+            list.add(m);
+            model.addRow(new Object[]{
+                    m.getNama(), m.getNim(), m.getNilai(), m.getStatus()
+            });
+            clearField();
+            refreshLaporan();
+
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Nilai harus angka!");
+        }
+    }
+
+    private void editData() {
+        int row = table.getSelectedRow();
+        if (row >= 0) {
+            selectedIndex = table.convertRowIndexToModel(row);
+            txtNama.setText(model.getValueAt(selectedIndex, 0).toString());
+            txtNIM.setText(model.getValueAt(selectedIndex, 1).toString());
+            txtNilai.setText(model.getValueAt(selectedIndex, 2).toString());
+        }
+    }
+
+    private void updateData() {
+        if (selectedIndex >= 0) {
+            int nilai = Integer.parseInt(txtNilai.getText());
             Mahasiswa m = new Mahasiswa(
                     txtNama.getText(),
                     txtNIM.getText(),
-                    Integer.parseInt(txtNilai.getText())
+                    nilai
             );
-            list.add(m);
-            FileManager.save(list);
+            list.set(selectedIndex, m);
+            model.setValueAt(m.getNama(), selectedIndex, 0);
+            model.setValueAt(m.getNim(), selectedIndex, 1);
+            model.setValueAt(m.getNilai(), selectedIndex, 2);
+            model.setValueAt(m.getStatus(), selectedIndex, 3);
+            selectedIndex = -1;
             clearField();
             refreshLaporan();
-            JOptionPane.showMessageDialog(this, "Data berhasil ditambahkan");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Input tidak valid!");
         }
     }
 
-    // ================= UPDATE =================
-    private void updateData() {
-        if (selectedIndex >= 0) {
-            try {
-                Mahasiswa m = new Mahasiswa(
-                        txtNama.getText(),
-                        txtNIM.getText(),
-                        Integer.parseInt(txtNilai.getText())
-                );
-                list.set(selectedIndex, m);
-                FileManager.save(list);
-                selectedIndex = -1;
-                clearField();
-                refreshLaporan();
-                JOptionPane.showMessageDialog(this, "Data berhasil diupdate");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Input tidak valid!");
-            }
-        } else {
-            JOptionPane.showMessageDialog(this, "Klik Edit pada tabel terlebih dahulu!");
+    private void hapusData() {
+        int row = table.getSelectedRow();
+        if (row >= 0) {
+            int idx = table.convertRowIndexToModel(row);
+            list.remove(idx);
+            model.removeRow(idx);
+            refreshLaporan();
         }
-    }
-
-    // ================= READ + DELETE =================
-    private void showTablePopup() {
-        JDialog dialog = new JDialog(this, "List Data Mahasiswa", true);
-        dialog.setSize(800, 420);
-        dialog.setLocationRelativeTo(this);
-        dialog.setLayout(new BorderLayout());
-
-        model.setRowCount(0);
-        for (Mahasiswa m : list) {
-            model.addRow(new Object[]{m.nama, m.nim, m.nilai, m.status});
-        }
-
-        JTable table = new JTable(model);
-        table.setRowHeight(28);
-        setHeaderGreen(table);
-        setRowColor(table);   // <<< warna baris
-
-        JButton btnEdit = new JButton("Edit");
-        btnEdit.setBackground(new Color(46, 204, 113));
-        btnEdit.setForeground(Color.WHITE);
-
-        JButton btnHapus = new JButton("Hapus");
-        btnHapus.setBackground(new Color(231, 76, 60));
-        btnHapus.setForeground(Color.WHITE);
-
-        btnEdit.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row >= 0) {
-                selectedIndex = row;
-                txtNama.setText(model.getValueAt(row, 0).toString());
-                txtNIM.setText(model.getValueAt(row, 1).toString());
-                txtNilai.setText(model.getValueAt(row, 2).toString());
-                dialog.dispose();
-            }
-        });
-
-        btnHapus.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row >= 0) {
-                list.remove(row);
-                FileManager.save(list);
-                model.removeRow(row);
-                refreshLaporan();
-            }
-        });
-
-        JPanel panelBtn = new JPanel();
-        panelBtn.add(btnEdit);
-        panelBtn.add(btnHapus);
-
-        dialog.add(new JScrollPane(table), BorderLayout.CENTER);
-        dialog.add(panelBtn, BorderLayout.SOUTH);
-        dialog.setVisible(true);
     }
 
     // ================= UTIL =================
     private void refreshLaporan() {
-        long lulus = list.stream().filter(m -> m.status.equals("LULUS")).count();
-        long tidakLulus = list.size() - lulus;
-
+        long lulus = list.stream()
+                .filter(m -> m.getStatus().equals("LULUS"))
+                .count();
         lblLaporan.setText(
-                "Jumlah Lulus: " + lulus +
-                        " | Tidak Lulus: " + tidakLulus
+                "Total Data: " + list.size() +
+                        " | Lulus: " + lulus +
+                        " | Tidak Lulus: " + (list.size() - lulus)
         );
-    }
-
-    private JButton createButton(String text, Color color) {
-        JButton btn = new JButton(text);
-        btn.setBackground(color);
-        btn.setForeground(Color.WHITE);
-        btn.setFont(new Font("Arial", Font.BOLD, 13));
-        btn.setOpaque(true);
-        btn.setBorderPainted(false);
-        return btn;
     }
 
     private void clearField() {
@@ -209,45 +213,15 @@ public class Main extends JFrame {
         txtNilai.setText("");
     }
 
-    // ========== WARNA HEADER ==========
-    private void setHeaderGreen(JTable table) {
-        DefaultTableCellRenderer header = new DefaultTableCellRenderer();
-        header.setBackground(new Color(230, 180, 213));
-        header.setForeground(Color.BLACK);
-        header.setHorizontalAlignment(JLabel.CENTER);
-        header.setFont(new Font("Arial", Font.BOLD, 13));
+    private void setHeaderStyle(JTable table) {
+        DefaultTableCellRenderer h = new DefaultTableCellRenderer();
+        h.setHorizontalAlignment(JLabel.CENTER);
+        h.setBackground(new Color(180, 230, 180));
+        h.setFont(new Font("Arial", Font.BOLD, 13));
 
         for (int i = 0; i < table.getColumnCount(); i++) {
-            table.getColumnModel().getColumn(i).setHeaderRenderer(header);
+            table.getColumnModel().getColumn(i).setHeaderRenderer(h);
         }
-    }
-
-    // ========== WARNA BARIS ==========
-    private void setRowColor(JTable table) {
-        table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table,
-                                                           Object value, boolean isSelected, boolean hasFocus,
-                                                           int row, int column) {
-
-                Component c = super.getTableCellRendererComponent(
-                        table, value, isSelected, hasFocus, row, column);
-
-                String status = table.getValueAt(row, 3).toString();
-
-                if (status.equals("LULUS")) {
-                    c.setBackground(new Color(210, 226, 255));
-                } else {
-                    c.setBackground(new Color(220, 230, 255));
-                }
-
-                if (isSelected) {
-                    c.setBackground(new Color(140, 146, 255));
-                }
-
-                return c;
-            }
-        });
     }
 
     public static void main(String[] args) {

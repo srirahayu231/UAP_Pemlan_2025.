@@ -11,7 +11,11 @@ public class FileManager {
     public static void save(ArrayList<Mahasiswa> list) {
         try (PrintWriter pw = new PrintWriter(new FileWriter(FILE_NAME))) {
             for (Mahasiswa m : list) {
-                pw.println(m.nama + "," + m.nim + "," + m.nilai);
+                pw.println(
+                        m.getNama() + "," +
+                                m.getNim() + "," +
+                                m.getNilai()
+                );
             }
         } catch (IOException e) {
             JOptionPane.showMessageDialog(null, "Gagal menyimpan data!");
@@ -20,6 +24,7 @@ public class FileManager {
 
     public static ArrayList<Mahasiswa> load() {
         ArrayList<Mahasiswa> list = new ArrayList<>();
+
         try (BufferedReader br = new BufferedReader(new FileReader(FILE_NAME))) {
             String line;
             while ((line = br.readLine()) != null) {
@@ -31,8 +36,9 @@ public class FileManager {
                 ));
             }
         } catch (IOException e) {
-            // file belum ada → aman
+            // File belum ada → tidak error
         }
+
         return list;
     }
 }

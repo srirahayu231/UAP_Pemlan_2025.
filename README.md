@@ -91,5 +91,7 @@ Pengujian dilakukan secara manual sesuai skenario:
 ---
 
 ## 📣 Kontributor
-Nama Pengembang: **(isi nama Anda di sini)**
+Nama Pengembang: **(Sri Rahayu 2024-116)**
+Nama Pengembang: **(Nanda Andriani 2024-119)**
+
 
